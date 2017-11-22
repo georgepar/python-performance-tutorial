@@ -212,6 +212,6 @@ In this tutorial we showcased how flame graphs created for python applications a
 
 ## References
 
-[(1) CPU Flame Graphs](http://www.brendangregg.com/FlameGraphs/cpuflamegraphs.html)
-[(2) From python to numpy](https://www.labri.fr/perso/nrougier/from-python-to-numpy/)
+[(1) CPU Flame Graphs](http://www.brendangregg.com/FlameGraphs/cpuflamegraphs.html)  
+[(2) From python to numpy](https://www.labri.fr/perso/nrougier/from-python-to-numpy/)  
 [(3) Cython](http://cython.org/)
