@@ -1,4 +1,4 @@
-# python-performance-tutorial
+# Real world Python performance tuning
 A tutorial for optimizing CPU bound applications in python
 
 ## Introduction  
@@ -17,9 +17,11 @@ As a working example we will study parts and optimize parts of a suboptimal impl
 
 To get a sense of the effectiveness of this techniques, initial benchmarks show ~30x-40x speedup in execution time.
 
-## CPU Flame Graphs
+## Flame Graphs
 
-The first step when optimizating an application is profiling. By profiling we can focus on parts of the code that are more time consuming and focus on them to get maximum performance gains by spending minimum effort. There are many profiling tools for Python (cProfile, PyCharm's integrated profiler etc.) but I recommend using [Uber's pyflame](https://github.com/uber/pyflame). Pyflame is fast, simple to use and can generate flamegraph parseable profiling data. 
+The first step when optimizating an application is profiling. By profiling we can focus on parts of the code that are more time consuming and focus on them to get maximum performance gains by spending minimum effort. There are many profiling tools for Python (cProfile, PyCharm's integrated profiler etc.) but I recommend using Flame Graphs, which are a visual and intuitive profiling tool. Note that Flame Graphs are not specific to python, but can be also be used for C/C++, Java, node.js etc.
+
+To this purpose we can use [Uber's pyflame](https://github.com/uber/pyflame). Pyflame is fast, simple to use and can generate flamegraph parseable profiling data. 
 
 Flame Graphs are a visualization for sampled stack traces, which allows hot code-paths to be identified quickly. Here's an example. Github markdown doesn't allow full rendering of SVGs for security purposes, but if you clone the repo and open the SVGs in your browser the boxes should be clickable and you should be able to zoom in/out:
 
@@ -59,7 +61,7 @@ pyflame -s 10 -r 0.01 -o perf.data -t python my_script.py
 firefox perf.svg
 ```
 
-Here's the flamegraph for our starting implementation of the MDS algorithm: 
+Here's the flamegraph for our starting implementation of the MDS algorithm. Note that the boxes don't only correspond to the function in the stack, but also to the line of code inside the function which gives us even more fine grained information: 
 ![Alt text](./starting_implementation.svg)
 
 ## Vectorizing operations with NumPy  
@@ -127,13 +129,12 @@ In the vectorized implementation flamegraph we can identify the following hotspo
 But can we do better? The first hotspot is an off the self optimized numpy implementation for norm calculation and `compute_mds_error` cannot be vectorized any further. To proceed we must note:
 
 1. that numpy's norm function is too general for our purposes. It surely has a lot of unneeded checks and generalizations that don't apply to our case  
-2. `d_current` is symmetric, which means that compute_mds_error does two times the work it should be doing  
-3. Accounting for the `d_current` symmetric nature is not so trivial in a vectorized implementation   
+2. `d` and `d_goal` are symmetric matrices, which means that compute_mds_error does two times the work it should be doing  
 
-Enter Cython (or C for the faint hearted). Cython will allow us to write variants of these functions that have C like performance. The speed gains by rewritting slow functions in Cython are due to
+Enter Cython (or C for the faint if heart). Cython will allow us to write variants of these functions that have C like performance. The speed gains by rewritting slow functions in Cython are due to
 
 1. Cython allows for type annotations, which speed up Python's type inference  
-2. We don't have to write vectorized code in Cython, so we can handle all the low level optimizations (like symmetric matrices)
+2. We don't have to write vectorized code in Cython, so we can handle all the low level optimizations (like symmetric matrices, memory access patterns)
 3. Cython code is transpiled in C and then we can compile it with the `-O3` flag and let gcc do further optimizations  
 4. In Cython we can do some unsafe optimizations like disabling Python's GIL for parallelization, disabling bounds check etc  
 5. In Cython we can directly use functions from optimized C libraries (like libc)  
@@ -192,8 +193,8 @@ def mse(double [:] d_goal, double [:] d):
 ```
 
 Notice: 
-- We provided type annotations by using Cython's builtin `cdef`
-- We write C style code, but with Python syntax and utilities (e.g. garbage collection)  
+- We provided type annotations using Cython's builtin `cdef`
+- We write C style code, but with Python syntax and conveniences (e.g. garbage collection)  
 
 We can compile Cython by running:
 ```bash
@@ -201,6 +202,16 @@ cython mds_utils.pyx
 gcc -Wno-cpp -shared -fno-strict-aliasing -fopenmp -ffast-math -O3 -Wall -fPIC -I/usr/include/python2.7 -I/usr/local/lib/python2.7/dist-packages/numpy/core/include/ -o mds_utils.so mds_utils.c
 ```
 
-The final product runs the benchmark in about 2-3 seconds which indicates over 30x performance gains.
+The final product runs the benchmark in about 2-3 seconds which indicates about 40x performance improvement.
 
-## Conclusion
+In the future we want to investigate Cython's parallel module to parallelize pieces of the code.
+
+## Conclusions
+
+In this tutorial we showcased how flame graphs created for python applications and how to identify hotspots in an application using them. We demonstrated how an inefficient for loop based implementation can be converted to an efficient vectorized one. Finally we showed how to take the optimization process one step further by utilizing Cython.
+
+## References
+
+[(1) CPU Flame Graphs](http://www.brendangregg.com/FlameGraphs/cpuflamegraphs.html)
+[(2) From python to numpy](https://www.labri.fr/perso/nrougier/from-python-to-numpy/)
+[(3) Cython](http://cython.org/)
