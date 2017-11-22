@@ -85,7 +85,8 @@ This function essentially computes the distance of each point (row) in `Xs` from
 It is well documented that NumPy operations don't have optimal performance when used in for loops. Instead all operations should be vectorized as follows:
 
 ```python
-def compute_distance_matrix(xs, d_current, i):
+# function was renamed during refactoring.
+def update_distance_matrix(xs, d_current, i):
     idx = np.arange(xs.shape[0])
     norm = NORM2(xs - xs[i], ord=2, axis=1)
     d_current[idx, i] = norm
@@ -118,3 +119,88 @@ We can see that the vectorized versions are cleaner and easier to understand. By
 
 ## Optimizing slow functions with Cython
 
+In the vectorized implementation flamegraph we can identify the following hotspots:
+
+1. `numpy.linalg.norm`  
+2. `compute_mds_error`  
+
+But can we do better? The first hotspot is an off the self optimized numpy implementation for norm calculation and `compute_mds_error` cannot be vectorized any further. To proceed we must note:
+
+1. that numpy's norm function is too general for our purposes. It surely has a lot of unneeded checks and generalizations that don't apply to our case  
+2. `d_current` is symmetric, which means that compute_mds_error does two times the work it should be doing  
+3. Accounting for the `d_current` symmetric nature is not so trivial in a vectorized implementation   
+
+Enter Cython (or C for the faint hearted). Cython will allow us to write variants of these functions that have C like performance. The speed gains by rewritting slow functions in Cython are due to
+
+1. Cython allows for type annotations, which speed up Python's type inference  
+2. We don't have to write vectorized code in Cython, so we can handle all the low level optimizations (like symmetric matrices)
+3. Cython code is transpiled in C and then we can compile it with the `-O3` flag and let gcc do further optimizations  
+4. In Cython we can do some unsafe optimizations like disabling Python's GIL for parallelization, disabling bounds check etc  
+5. In Cython we can directly use functions from optimized C libraries (like libc)  
+
+Here is the final implementation of the fast Cython variants.
+
+- We can swap out `numpy.linalg.norm` calls with `dist_from_point`
+```python
+import numpy as np
+cimport numpy as np
+cimport cython
+from cython.parallel cimport parallel, prange
+
+# don't use np.sqrt - the sqrt function from the C standard library is much faster
+from libc.math cimport sqrt
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def dist_from_point(double [:, :] x, double [:] y):
+    cdef:
+        Py_ssize_t nrow = x.shape[0]
+        Py_ssize_t ncol = y.shape[0]
+        Py_ssize_t ii = 0, jj = 0
+
+        double s = 0, diff = 0
+
+        np.ndarray[np.float64_t, ndim=1] d = np.zeros(nrow, np.double)
+
+    for ii in range(nrow):
+        s = 0
+        for jj in range(ncol):
+            diff = x[ii, jj] - y[jj]
+            s += diff * diff
+        s = sqrt(s)
+        d[ii] = s
+    return d
+```
+
+- We can swap out `compute_mds_error` with `mse`. Notice we make use of the symmetric nature of `d` & `d_goal`
+```python
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def mse(double [:] d_goal, double [:] d):
+    cdef:
+        Py_ssize_t N = d.shape[0]
+        Py_ssize_t ii = 0
+
+        double s = 0, diff = 0
+
+    for ii in range(N):
+        diff = d_goal[ii] - d[ii]
+        s += diff * diff
+    return s
+```
+
+Notice: 
+- We provided type annotations by using Cython's builtin `cdef`
+- We write C style code, but with Python syntax and utilities (e.g. garbage collection)  
+
+We can compile Cython by running:
+```bash
+cython mds_utils.pyx
+gcc -Wno-cpp -shared -fno-strict-aliasing -fopenmp -ffast-math -O3 -Wall -fPIC -I/usr/include/python2.7 -I/usr/local/lib/python2.7/dist-packages/numpy/core/include/ -o mds_utils.so mds_utils.c
+```
+
+The final product runs the benchmark in about 2-3 seconds which indicates over 30x performance gains.
+
+## Conclusion
