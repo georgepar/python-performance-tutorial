@@ -90,7 +90,7 @@ It is well documented that NumPy operations don't have optimal performance when 
 # function was renamed during refactoring.
 def update_distance_matrix(xs, d_current, i):
     idx = np.arange(xs.shape[0])
-    norm = NORM2(xs - xs[i], ord=2, axis=1)
+    norm = np.linalg.norm(xs - xs[i], ord=2, axis=1)
     d_current[idx, i] = norm
     d_current[i, idx] = norm
     return d_current
@@ -112,7 +112,7 @@ def compute_mds_error(D_goal,D_current,i=None):
 - Vectorized implementation
 ```python
 def compute_mds_error(d_goal, d_current):
-    return SUM((d_goal - d_current) ** 2)
+    return np.sum((d_goal - d_current) ** 2)
 ```
 
 We can see that the vectorized versions are cleaner and easier to understand. By running the benchmark again we can see it takes about 6 seconds, which is a 15x performance boost by simply vectorizing 2 functions. The flame graph for the vectorized version is shown below:
