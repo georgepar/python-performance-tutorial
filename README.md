@@ -20,3 +20,5 @@ As a working example we will study parts and optimize parts of a suboptimal impl
 The first step when optimizating an application is profiling. By profiling we can focus on parts of the code that are more time consuming and focus on them to get maximum performance gains by spending minimum effort. There are many profiling tools for Python (cProfile, PyCharm's integrated profiler etc.) but I recommend using [Uber's pyflame](https://github.com/uber/pyflame). Pyflame is fast, simple to use and can generate flamegraph parseable profiling data. 
 
 Flame Graphs are a visualization for sampled stack traces, which allows hot code-paths to be identified quickly. Here's an example:
+![Alt text](https://raw.githubusercontent.com/georgepar/python-performance-tutorial/master/example.svg)
+<img src="https://raw.githubusercontent.com/georgepar/python-performance-tutorial/master/example.svg">
