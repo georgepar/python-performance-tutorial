@@ -82,7 +82,7 @@ def compute_distance_matrix(Xs,D_current=None,i=None):
     return D_current
 ```
 
-This function essentially computes the distance of each point (row) in `Xs` from a specified row `Xs[i]` and modifies the appropriate column/row in the `D_current` distance matrix. Notice that `D_current` is symmetric.
+This function essentially computes the distance of each point (row) in `Xs` from a specified row `Xs[i]` and modifies the appropriate column/row in the `D_current` distance matrix.
 
 It is well documented that NumPy operations don't have optimal performance when used in for loops. Instead all operations should be vectorized as follows:
 
@@ -126,15 +126,12 @@ In the vectorized implementation flamegraph we can identify the following hotspo
 1. `numpy.linalg.norm`  
 2. `compute_mds_error`  
 
-But can we do better? The first hotspot is an off the self optimized numpy implementation for norm calculation and `compute_mds_error` cannot be vectorized any further. To proceed we must note:
-
-1. that numpy's norm function is too general for our purposes. It surely has a lot of unneeded checks and generalizations that don't apply to our case  
-2. `d` and `d_goal` are symmetric matrices, which means that compute_mds_error does two times the work it should be doing  
+But can we do better? The first hotspot is an off the self optimized numpy implementation for norm calculation and `compute_mds_error` cannot be vectorized any further. To proceed we must implement more special purpose functions and take advantage of compiler optimizations.
 
 Enter Cython (or C for the faint if heart). Cython will allow us to write variants of these functions that have C like performance. The speed gains by rewritting slow functions in Cython are due to
 
 1. Cython allows for type annotations, which speed up Python's type inference  
-2. We don't have to write vectorized code in Cython, so we can handle all the low level optimizations (like symmetric matrices, memory access patterns)
+2. We don't have to write vectorized code in Cython, so we can handle all the low level optimizations (like memory access patterns)
 3. Cython code is transpiled in C and then we can compile it with the `-O3` flag and let gcc do further optimizations  
 4. In Cython we can do some unsafe optimizations like disabling Python's GIL for parallelization, disabling bounds check etc  
 5. In Cython we can directly use functions from optimized C libraries (like libc)  
@@ -174,7 +171,7 @@ def dist_from_point(double [:, :] x, double [:] y):
     return d
 ```
 
-- We can swap out `compute_mds_error` with `mse`. Notice we make use of the symmetric nature of `d` & `d_goal`
+- We can swap out `compute_mds_error` with `mse`.
 ```python
 
 @cython.boundscheck(False)
