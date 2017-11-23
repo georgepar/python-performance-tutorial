@@ -205,7 +205,7 @@ In the future we want to investigate Cython's parallel module to parallelize pie
 
 ## Conclusions
 
-In this tutorial we showcased how flame graphs created for python applications and how to identify hotspots in an application using them. We demonstrated how an inefficient for loop based implementation can be converted to an efficient vectorized one. Finally we showed how to take the optimization process one step further by utilizing Cython.
+In this tutorial we showcased how flame graphs created for python applications and how to identify hotspots in an application using them. We demonstrated how an inefficient for loop based implementation can be converted to an efficient vectorized one. Finally we showed how to take the optimization process one step further and get C-like speed for slow functions with Cython.
 
 ## References
 
